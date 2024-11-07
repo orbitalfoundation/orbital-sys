@@ -1,0 +1,15 @@
+{
+  "name": "orbital-sys",
+  "version": "1.0.0",
+  "description": "experimental messaging kernel for data driven apps",
+  "main": "sys.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/orbitalfoundation/orbital-sys.git"
+  },
+  "author": "",
+  "license": "MIT"
+}

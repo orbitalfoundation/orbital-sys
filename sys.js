@@ -1,113 +1,158 @@
 
-const resolvers = []
+import { log,warn,err } from './log.js'
 
-//
-// An observer that remembers other observers
-// @todo move this somewhere else like to an included library
-//
+import resolver_resolver from './resolve.js'
+import obliterate_resolver from './obliterate.js'
+import schema_resolver from './schema.js'
+//import { family_resolver } from './family.js'
+import load_resolver from './load.js'
+import tick_resolver from './tick.js'
 
-const resolver_resolver = (blob) => {
-	if(!blob.resolve) return
+const isServer = (typeof window === 'undefined') ? true : false
 
-	// could bind optionally?
-	if(false && blob.resolve.name.startsWith("bound ") == false) {
-		console.log("sys resolve - since there is no binding creating one")
-		blob.resolve = blob.resolve.bind(blob)
-	}
-
-	// already registered?
-	for(let i = 0; i < resolvers.length ; i++ ) {
-		const candidate = resolvers[i]
-		let exists = blob === candidate || blob.resolve === candidate.resolve || (blob.id && blob.id === candidate.id)
-		if(exists) {
-			if(blob.obliterate) {
-				resolvers.splice(i,1)
-			}
-			return
-		}
-	}
-
-	// register
-	resolvers.push(blob)
-
-	console.log("sys resolve - adding resolver",blob)
+if(isServer) {
+	await import('./server-log.js')
 }
 
-resolvers.push( { id:'sys/resolver_resolver', resolve:resolver_resolver } )
-
 //
-// An observer that helps tidy up parent child relationships
-// This helper is a 'nice to have' - arguably the burden could be on each handler
-// @todo note children are not individually marked as 'obliterate' ...
-// @todo move this somewhere else like to an included library
+// simple optional filters as a way to reduce traffic
 //
 
-const family_resolver = (blob) => {
-
-	if(blob.obliterate && blob.parent && blob.parent.children) {
-		blob.parent.children = blob.parent.children.filter(item => item.id !== blob.id)
+const filter_match = (blob,resolver) => {
+	if(!resolver.resolve.filter) return true
+	for( const [k,v] of Object.entries(resolver.resolve.filter)) {
+		if(!blob.hasOwnProperty(k)) return false
 	}
-
-	else if(blob.parent) {
-		if(!blob.parent.children) blob.parent.children = []
-		const found = blob.parent.children.find((item) => item === blob)
-		if(!found) {
-			blob.parent.children.push(blob)
-		}
-	}
+	return true
 }
 
-resolvers.push( { id:'sys/family_resolver', resolve: family_resolver } )
 
 //
-// System primary event handling pipeline
-//
-// Simply passes blob through a series of handlers in order - fairly mindless.
-// Does return nothing if the request was backlogged; I'm not expecting anybody to use this feature
-// And returns the blob and all ammendments if was a top level interaction with no backlog
-//
-// A note on async:
-//
-// It is a nice helpful feature here to support async on individual request handler flow
-// However callers here cannot necessarily know if they are in outermost scope
-// Typically that means callers should call sys.resolve() not await sys.resolve()
+// handle events sequentially
 //
 
-const queue = []
+const resolve = async function () {
 
-const resolve = async (blob) => {
-
-	// add incoming state to queue so that outsiders can reason about event ordering
-	queue.push(blob)
-
-	// if the queue is busy then return; return nothing as a way to indicate backlog
-	if(queue.length > 1) {
-		return null
+	// if queue is busy then push work and return
+	const queue = this._queue
+	if(queue.length) {
+		queue.push(...arguments)
+		return
 	}
 
-	// perform work in order - the queue can grow due to invocations below
+	// resolve work
+	queue.push(...arguments)
 	while(queue.length) {
 
-		blob = queue[0]
+		// get first element in queue; but leave in queue
+		const blob = queue[0]
 
-		console.log('sys traffic:',blob.id,blob)
-
-		// deal with this request - and allow other requests to pile up
-		for(const resolver of resolvers) {
-			await resolver.resolve(blob)
+		// unroll arrays as a courtesy; rewrite in place
+		if(Array.isArray(blob)) {
+			queue.splice(0,1,...blob)
+			continue
 		}
 
-		// deal with backlog if any
+		// sanity check
+		else if(!blob) {
+			err(`no data error`)
+			continue
+		}
+
+		// sanity check
+		else if(typeof blob === 'function') {
+			warn(`functions not supported yet`,blob)
+			continue
+		}
+
+		// sanity check
+		else if( typeof blob !== 'object') {
+			err(`must be an object`,blob)
+			continue
+		}
+
+		// use a copy of the resolvers before calling; since objects can register new resolvers on the fly
+		const unadulterated = [ ...this._resolvers ]
+		for(const resolver of unadulterated) {
+			// has a resolver?
+			if(!resolver.resolve) continue
+			// as a convenience function a resolver can be decorated with simple early filtering
+			if(!filter_match(blob,resolver)) continue
+			// perform calls synchronously at this level
+			let results = await resolver.resolve(blob,sys)
+			// the blob can be modified in transit explicitly or implicitly
+			if(!results) continue
+			// to force abort the chain an explicit change must be returned with this reserved term
+			if(results.force_abort_sys) break
+			// arguably this could be explicitly set - but it can be implicitly set that is a bit safer
+			// blob = results
+		}
+
+		// remove this element from queue
 		queue.shift()
+
+		// return blob when queue is empty as an indicator of completion
+		if(!queue.length) return blob
+	}
+}
+
+//
+// exploring an idea of storing resolve prioritization onto the resolve function itself @experimental
+// @todo note that these specific filters and schemas are not registered since they are declared before anything else
+//
+
+Object.assign(resolve,{
+	before:"everything",
+	after:null,
+	filter:null,
+	schema: { uuid: true, force_abort_sys: true }
+})
+
+///
+/// produceSys() allows for multiple instances of sys if desired
+///
+let counter = 1
+
+export function produceSys() {
+
+	const sys = {
+
+		// convenience
+		isServer,
+
+		// i'm encouraging an optional convention of having an id per entity
+		uuid: `orbital/sys/sys-${counter++}`,
+
+		// i'm encouraging an optional convention of having a description per entity
+		description: 'orbital pubsub broker',
+
+		// sys.resolve(args) is the pattern i'm using for all entities to handle messages
+		resolve,
+
+		// the sys queue itself; i encourage a pattern of using underbar for private state
+		_queue: [],
+
+		// the chain of resolvers - while this could be elsewhere it is convenient to have them here
+		_resolvers: [
+			resolver_resolver,
+			obliterate_resolver,
+			schema_resolver,
+			load_resolver,
+			tick_resolver
+		]
 	}
 
-	// return blob (and accumulated state) as a way to indicate completion of the round
-	return blob
+	return sys
 }
 
-const sys = globalThis.sys = {
-	id:'sys/resolver',
-	resolve
-}
+///
+/// a default instance of sys is available at globalThis.sys or 'sys' for other imports in the same context
+///
 
-export { sys }
+const sys = globalThis.sys = produceSys()
+
+///
+/// sys can also be explicitly referenced
+///
+
+export default sys

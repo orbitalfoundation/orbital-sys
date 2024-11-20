@@ -19,7 +19,7 @@ A piece of code can publish state:
 
 	const blob = { account }
 
-	sys(blob)
+	sys.resolve(blob)
 ```
 
 And another piece of code can react to state:
@@ -35,7 +35,7 @@ And another piece of code can react to state:
 		resolve
 	}
 
-	sys(blob)
+	sys.resolve(blob)
 ```
 
 The sys.resolve() method acts as a single point of entry for most activity; events are published here, and subscribing to events is registered here as well.
@@ -64,7 +64,7 @@ Richer examples of using entities would be to describe not just one property but
 		resolve
 	}
 
-	sys(entity)
+	sys.resolve(entity)
 ```
 
 In this example observers can catch this state or entity flying past and perform several operations in a row. A database observer can store it. An account observer can perhaps grant a public/private keypair to the account. A layout observer can paint that entity as part of a display. And the entity itself can also observe events from other sources.
@@ -163,7 +163,7 @@ Multiple independent instances of sys can be created if desired.
 
 This pubsub service declares globalThis.sys - so one doesn't even have to import the system itself in every file.
 
-However there are cases where developers may want to have two or more instances of sys running at the same time. There are serveral variations in how sys() can be used to support this:
+However there are cases where developers may want to have two or more instances of sys running at the same time. There are serveral variations in how sys.resolve() can be used to support this:
 
 ```
 
@@ -171,10 +171,10 @@ However there are cases where developers may want to have two or more instances 
 	import 'orbital-sys'
 
 	// sys can be invoked anywhere; leveraging globalThis.sys
-	sys(blob)
+	sys.resolve(blob)
 
 	// globalThis can be explicitly cited for clarity
-	globalThis.sys(blob)
+	globalThis.sys.resolve(blob)
 
 	// observers typically have a 'resolve' so sys.resolve() is also valid notation
 	sys.resolve(blob)
@@ -195,8 +195,8 @@ However there are cases where developers may want to have two or more instances 
 		sys.resolve({html:{parent:null,div:`Name: ${blob.account.name} registered`}})
 	}
 
-	sys1({resolve})
-	sys1({account:{name:"new account",status:"new"}})
+	sys1.resolve({resolve})
+	sys1.resolve({account:{name:"new account",status:"new"}})
 
 ```
 

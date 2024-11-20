@@ -1,4 +1,6 @@
-import './sys.js'
+// @todo this will become a test suite
+
+import '../sys.js'
 
 // resolvers can be declared as functions with their own 'this' scope
 const resolve = function (blob) {

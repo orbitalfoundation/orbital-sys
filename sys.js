@@ -115,7 +115,7 @@ let counter = 1
 
 export function produceSys() {
 
-	const sys = {
+	const internals = {
 
 		// convenience
 		isServer,
@@ -141,6 +141,8 @@ export function produceSys() {
 			tick_resolver
 		]
 	}
+
+	const sys = Object.assign( resolve.bind(internals), internals )
 
 	return sys
 }

@@ -4,31 +4,8 @@ const uuid = "orbital/sys/load"
 
 const description = `Load component loads other assets on demand`
 
-const _load_configuration = {
-	manifest:'index.js',
-	importmaps: {
-		'orbital':'orbital',
-		'@':'' // @todo may deprecate support for '@' notation since it is no longer used
-	},
-	anchor:null
-}
-
-const visited = {}
-
 const resolve = async function(blob,sys) {
 	if(!blob.load) return
-
-	//
-	// a persistent anchor concept is used to ground subsequent loads - @todo may deprecate it is not used now
-	// @todo this may need some push/pop style scoping such as when loading manifests from some other projects
-	//
-
-	if(blob.anchor && blob.anchor.length) {
-		let temp = blob.anchor
-		if(temp.startsWith('/')) temp = temp.slice(1)
-		if(temp.endsWith('/')) temp = temp.slice(0,-1)
-		_load_configuration.anchor = temp.length ? temp : null
-	}
 
 	//
 	// load requested files
@@ -40,34 +17,41 @@ const resolve = async function(blob,sys) {
 	const candidates = Array.isArray(blob.load) ? blob.load : [blob.load]
 	for(let resource of candidates) {
 
-		// divine the real location of the resource
-		resource = harmonize_resource_path(this._load_configuration,resource)
+		// divine the real location of the resource by magic
+		resource = harmonize_resource_path(this,blob,resource)
 
-		// because of the fickle nature of asset geography in filesystems we inject the file path into assets
-		const remember_resource_path = (item) => {
-			if(Array.isArray(item)) {
-				item.forEach( remember_resource_path )
-			} else {
-				item._resource_path = resource
-			}
-		}
-
-		// go out of our way to block duplicate load attempts on canonical resources
+		// only visit a file once ever
+		if(!this._visited) this._visited = {}
+		const visited = this._visited
 		if(visited[resource]) {
 			// warn(uuid,' - already attempted to load once',resource)
 			continue
 		}
 		visited[resource] = true
 
+		// fetch asset
+		// @todo there is a case where i want to speculatively peek at folders; I can't seem to do it gracefully
 		try {
-			// trying to reduce an error console log - sadly not easy to do without a custom server method @todo
-			let exists = true //await fetch(resource, { method: 'HEAD' })
+			let exists = true //await fetch(resource, { method: 'HEAD' }) <- would like to avoid throwing an error...
 			if(exists) {
 				const module = await import(resource)
 				for(const [k,v] of Object.entries(module)) {
 					try {
+
 						//log(uuid,'resolving',k,resource)
+						const remember_resource_path = (item) => {
+							if(!item) {
+								err(uuid,'- error corrupt exports',k)
+							} else if(Array.isArray(item)) {
+								item.forEach( remember_resource_path )
+							} else if(typeof item === 'object') {
+								item._resource_path = resource
+							}
+						}
+
+						// stuff resource path into found exports - @todo is this really useful? store that fact here instead?
 						remember_resource_path(v)
+
 						await sys.resolve(v)
 					} catch(e) {
 						err(uuid,' - error corrupt artifact key=',k,'content=',v,'error=',e)
@@ -84,55 +68,69 @@ export default {
 	uuid,
 	description,
 	resolve,
-	_load_configuration
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
+// this could all use some work - @todo
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const isServer = (typeof window === 'undefined') ? true : false
-
-// note that relative cwd ../../ cannot be used on server due to path aliasing - it has to be a full blown process.cwd()
 const cwd = (typeof process === 'undefined') ? "" : process.cwd()
 
-export const harmonize_resource_path = (config,resource) => {
+export const harmonize_resource_path = (scope,blob,resource) => {
 
-	// valid?
+	// have default configuration
+	if(!scope._config) {
+		scope._config = {
+			index:'index.js',
+			importmaps: {
+				'orbital':'orbital',
+				'@':''
+			},
+			root:null
+		}
+	}
+	const config = scope._config
+
+	// ignore unrecognized
 	if (!resource || typeof resource !== 'string' && !(resource instanceof String) || !resource.length) {
-		err(uuid,'- invalid resource',resource,resource)
 		return null
 	}
 
-	// external?
+	// ignore external
 	const lower = resource.toLowerCase()
 	if( lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('file://') ) {
-		log(uuid,'- external resource',resource)
 		return resource
 	}
 
-	// pick apart and rebuild the path
+	// conceptually work from a current folder path, allowing pushing and popping; disallowing bursting the root folder
 	let out = []
+
+	// split the path into pieces and analze each piece
 	const parts = resource.split("/")
 	for(let i = 0; i < parts.length; i++) {
 		let part = parts[i]
 		switch(part) {
 			case '.':
-				// @todo dunno what to do ...
+				// @todo dunno what to do ... this looks like a "./myfile.js" ... ignore it i guess
 				break
 			case '..':
-				// perform the .. right now - to prevent escaping the path space on client and server
+				// perform the .. right now - but prevent bursting or escaping the root folder on client and server
 				out.pop()
 				break
 			case '':
+				// on both server and client if the file ends in '/' then force inject a default manifest typically '/index.js'
 				if(i == parts.length-1) {
-					// on both server and client if the file ends in '/' then force inject a default manifest typically '/index.js'
-					out.push(config.manifest)
+					out.push(config.index)
+				} else {
+					// this appears to be a // or something not at the end of the path - illegal do nothing
 				}
 				break
 			default:
 				if(!i) {
-					// anchor paths that do not start with '/'
-					if(config.anchor) {
-						out.push(config.anchor)
+					// inject a common root if any - this can be used when serving from weird subdirectories
+					if(config.root) {
+						out.push(config.root)
 					}
 					// may rewrite token or throw it away
 					if(config.importmaps.hasOwnProperty(part)) {
@@ -146,11 +144,19 @@ export const harmonize_resource_path = (config,resource) => {
 		}
 	}
 
-	// resources are located within their relative application filespace on server and client
-	out.unshift( isServer ? cwd : '')
+	// if anchor try use it - this is a slight hack
+	if(blob.anchor) {
+		out.unshift( blob.anchor + "/..")
+	}
 
-	// put all back together and return
-	return out.length ? out.join('/')  : null
+	// otherwise if no anchor then assume is loading from root
+	else {
+		out.unshift( isServer ? cwd : '')
+	}
+
+	// stuff the slashes back in and turn into a string and return that
+	const path = out.length ? out.join('/')  : null
+
+	return path
 }
-
 

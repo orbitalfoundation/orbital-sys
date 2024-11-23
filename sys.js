@@ -47,7 +47,7 @@ const resolve = async function () {
 		// get first element in queue; but leave in queue
 		const blob = queue[0]
 
-		// unroll arrays as a courtesy; rewrite in place
+		// unroll arrays as a courtesy; rewrite in place - never modify the original blob
 		if(Array.isArray(blob)) {
 			queue.splice(0,1,...blob)
 			continue
@@ -72,6 +72,8 @@ const resolve = async function () {
 		}
 
 		// use a copy of the resolvers before calling; since objects can register new resolvers on the fly
+		// @todo it is debatable if this idea of 'use a copy of resolvers' should be enforced; may be too strict
+
 		const unadulterated = [ ...this._resolvers ]
 		for(const resolver of unadulterated) {
 			// has a resolver?
@@ -114,6 +116,8 @@ Object.assign(resolve,{
 let counter = 1
 
 export function produceSys() {
+
+	// @todo the below resolvers need to be deep cloned to truly allow multiple separate copies of sys
 
 	const internals = {
 

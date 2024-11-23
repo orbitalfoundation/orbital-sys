@@ -1,9 +1,10 @@
 {
   "name": "orbital-sys",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "experimental pubsub messaging kernel for data driven apps",
   "main": "sys.js",
   "scripts": {
+    "test": "node tests/test.js"
   },
   "repository": {
     "type": "git",

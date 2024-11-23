@@ -15,7 +15,7 @@ resolve.filter = { graceful: true }
 const alpha = { uuid:"alpha", resolve }
 
 // register the entity and the resolver, note the resolver is not called on the self registration event
-await sys.resolve(alpha)
+await sys(alpha)
 
 // another entity that catches all traffic - no filter
 const beta = {
@@ -25,27 +25,30 @@ const beta = {
 }
 
 // registering this entity should invoke the resolver on alpha if was graceful only
-await sys.resolve(beta)
+await sys(beta)
 
 // repurposing a resolver that will resolve on happy
 const charlie = { uuid:"charlie" }
 charlie.resolve = resolve.bind(charlie)
 charlie.resolve.filter = { happy: true }
 charlie.resolve.before = "alpha"
-await sys.resolve(charlie)
+await sys(charlie)
 
 // destroying an entity and a resolver associated with it
 alpha.obliterate = true
-await sys.resolve(alpha)
+await sys(alpha)
 
 // send an event in general just for fun
-await sys.resolve({uuid:"happy",happy:true})
+await sys({uuid:"happy",happy:true})
 
-await sys.resolve({
-	load: [ "./test2.js" ]
+// @todo - we need a much better concept of import.meta or current folder!
+
+await sys({
+	anchor: import.meta.url,
+	load: [ "test2.js" ]
 })
 
-await sys.resolve({puppy:true})
+await sys({puppy:true})
 
 console.log(sys._resolvers)
 

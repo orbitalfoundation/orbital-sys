@@ -4,72 +4,157 @@
 
 An experimental publish/subscribe (pub/sub) messaging service written in javascript. It intended to decouple and orchestrate the behavior of other services within an application.
 
-## Example
+## Installing
 
-A piece of code can publish state:
+This can be imported as a module on the command line with npm or yarn:
 
 ```
-	import {sys} from 'orbital-sys'
+	npm i 'orbital-sys'
+```
 
+Or you can import from a cdn:
+
+```
+	import {sys} from 'https://cdn.jsdelivr.net/npm/orbital-sys@1.0.4/sys.js/+esm'
+```
+
+## Usage
+
+You can react to state flowing through the pub/sub network by registering an observer or 'resolver' in a javascript file like so:
+
+```
+	import {sys} from 'https://cdn.jsdelivr.net/npm/orbital-sys@1.0.3/sys.js/+esm'
+
+	const resolve = async (blob) => {
+		if(!blob.account) return
+		console.log("We saw an object with an account property fly past!",blob)
+	}
+
+	sys({resolve})
+```
+
+And you can publish state to registered pub/sub observers like so:
+
+```
 	const account = {
 		name: "Mary",
 		description: "Mary had a little lamb"
 		status: "new"
 	}
 
-	const blob = { account }
-
-	sys.resolve(blob)
+	sys({account})
 ```
 
-And another piece of code can react to state:
+## Conventional usage
+
+The method "sys()" is registered on globalThis.sys(). You can also use sys.resolve(arguments) if you wish. Sys() is a single point of entry for most activity. This pub/sub framework deviates from the expected pattern of sys.subscribe(filter,handler) and sys.publish(message) because of an idea of 'manifests' where you can inhale documents that describe state collections declaratively.
+
+## Simple Filters
+
+A resolver can have a 'simple filter' which matches the key names of the supplied object. This may be made more fancy later.
 
 ```
-	const resolve = async (blob) => {
-		if(blob.account) {
-			console.log("We saw an account!",blob)
+	function resolve(blob) {
+		console.log('got an event with kittens',blob)
+	}
+	resolve.filter = { kittens: {} }
+
+	sys({resolve})
+	sys({kittens:'purr'})
+	sys({dogs:'woof'})
+```
+
+## Live uncloned state
+
+State that is passed through sys() is 'live' and can be altered. I had been cloning state earlier but I found it useful to alter state live insitu - there are risks here of accidentally altering state somewhere far away - but also benefits. Later I may introduce a tag to indicate if an object should be cloned or is immutable.
+
+```
+	// add a sleep observer
+	const resolve = (blob)=> {
+		blob.sleep.sleepyness++
+	}
+	resolve.filter = { sleep: {} }
+	sys({resolve})
+
+	// add a kitten
+	const kitten = {
+		eats: {
+			food: 12,
+		},
+		climbs: {
+			speed: 14,
+		},
+		sleep: {
+			sleepyness: 0
 		}
 	}
+	sys(kitten)
 
-	const blob = {
-		resolve
-	}
-
-	sys.resolve(blob)
+	// this should report 1
+	console.log("kitten is getting sleepy",kitten.sleep.sleepyness)
 ```
 
-The sys.resolve() method acts as a single point of entry for most activity; events are published here, and subscribing to events is registered here as well.
+## State modifications are consecutive and 'live' as it filters through observers
+
+Every resolver gets a handle on durable persistent state that is instantiated once somewhere. That state can be modified, and resolvers can modify state before the next resolver gets that state.
+
+```
+	const resolver1 = (blob) => {
+		blob.my_special_value = 12
+	}
+	const resolver2 = (blob) => {
+		// prints '12'
+		console.log(blob.my_special_value)
+	}
+	sys.resolve({resolve:resolver1},{resolve:resolver2},{anyevent:'tickle'})
+```
 
 ## ECS Pattern
 
-This pub/sub library encourages a specific pattern of publishing an entity decorated with components. Rather than publishing "jump" one publishes { action: "jump" }.
+This pub/sub library encourages a specific pattern of publishing an 'object decorated with properties' or in actor nomenclature an 'entity decorated with components'. Rather than publishing "jump" one publishes { action: "jump" }.
 
-The ECS (entity component system) pattern can be thought of as a semantic bundle, or sentence, formed out of a vocabulary, expressing concepts from granular composition. Filtering on components is an organizing principle. For more on this topic this (unrelated) ECS service explores the concepts well: https://www.flecs.dev/flecs/ .
+The ECS (entity component system) pattern can be thought of as a semantic bundle, or sentence, formed out of a vocabulary, expressing concepts from granular composition. Filtering on components is an organizing principle. It's worth googling more on the ECS pattern.
 
 Richer examples of using entities would be to describe not just one property but several related properties:
 
 ```
-	const id = generateUUID()
-
 	const resolve = (blob) => {
-		console.log("noticed an account fly past",blob)
+		console.log("noticed something with physics fly past",blob)
 	}
-	resolve.filter = { physics: { collision: true } }
+	resolve.filter = { physics: { } }
+	sys({resolve})
 
-	const entity = {
-		id,
+	sys({
+		id:'rooms/dragons-lair/treasurechest-3',
 		physics: { mass: 12 },
 		appearance: { geometry: "sphere" },
 		stats: { wisdom: 13, charisma: 24 }
-		resolve
-	}
-
-	sys.resolve(entity)
+	})
 ```
 
 In this example observers can catch this state or entity flying past and perform several operations in a row. A database observer can store it. An account observer can perhaps grant a public/private keypair to the account. A layout observer can paint that entity as part of a display. And the entity itself can also observe events from other sources.
 
 Important concepts such as removing observers, or more efficient filtering can be added as well without breaking this pattern.
+
+## Resolvers are blind to self, order dependent, and resolve only on past state
+
+The resolver is not invoked on itself. At the moment this is on purpose and special code is written to make sure that resolvers do not see themselves. This may change - I can see arguments for doing the opposite:
+
+```
+	const resolve = (blob) => {
+		console.log("noticed something with physics fly past",blob)
+	}
+	resolve.filter = { physics: { } }
+	sys({
+		resolve,
+		physics: {}
+	})
+	// the resolver will not trigger even though the object has a physics property
+```
+
+Also worth re-iterating that a resolver registered *after* some state is published does not see that state. Right now the system is order-dependent. This may change because I do feel it is something of a design defect to have order dependent inflation of a whole system. I may have a state replay or some kind of deferred registration of state after resolvers.
+
+Finally it is worth noting that a given call to sys() could register multiple new resolvers, but for the purposes of handling a single event those new resolvers are ignored. This may change.
 
 ## Unrolling
 
@@ -86,9 +171,9 @@ As a convenience you can pass multiple items, or even arrays to sys.resolve. The
 	sys.resolve([alpha,beta],gamma,[delta])
 ```
 
-## Resolver Order and Simple Filters
+## Resolver Order
 
-Resolvers can have relative order to each other. Also a resolver can have a 'simple filter' which matches the key names of the supplied object:
+Resolvers can have relative order to each other:
 
 ```
 	const message = { test: true }
@@ -108,11 +193,19 @@ Resolvers can have relative order to each other. Also a resolver can have a 'sim
 	// prints "beta hello" then "alpha hello"
 ```
 
-Currently there is no strategy to deal with out of order resolver registration. If you have events intended for a resolver, but that resolver was not registered yet, those events are not handled later when the resolver shows up.
+Currently there is no strategy to deal with out of order resolver registration. If you have events intended for a resolver, but that resolver was not registered yet, those events are not handled later when the resolver shows up. This probably needs work.
 
-## Schemas
+## Resolver singleton
 
-As a developer aid it is possible to reserve object schemas. This helps developers avoid colliding with each other on a reserved namespace for an ecs vocabulary:
+At the moment a given resolver can be registered only once - I detect if the actual function object is already registered. This may change. I can see an argument for recycling a single resolver on many object instances.
+
+## Schema namespace reservation
+
+As a developer aid it is possible to reserve component names on the root namespace of an entity. This helps developers avoid colliding with each other on a reserved namespace for an ecs vocabulary. Further we imagine that with a formal schema library it would be possible to fully declare the entire set of properties of any given component, but this is not enforced yet.
+
+Schemas are used right now for simple filters.
+
+Also schema reservation does prevent developers from colliding with each other - if two separate developers attempt to resolve the same schema an error message is reported (arguably an exception should be thrown but we do not do that yet).
 
 ```
 	const physics = {
@@ -132,6 +225,26 @@ As a developer aid it is possible to reserve object schemas. This helps develope
 	// this reports an error because the concept of 'physics' has a namespace collision
 ```
 
+There are formal schema libraries for javascript and arguably one could be used. This may be improved.
+
+## Reserved terms
+
+These already mean something and cannot be used for new purposes:
+
+```
+	const myobject = {
+		uuid,
+		resolve,
+		tick,
+		load,
+		parent,
+		children,
+		obliterate
+	}
+```
+
+There is some argument that the kernel should form a separate namespace outside of the user namespace - or at least to try to consolidate these as much as possible to reduce pressure on user namespaces. This may be revisited. For now these are reserved.
+
 ## Aborting
 
 Calling sys.resolve({mydata:true}) will call all unfiltered resolvers, or all resolvers that are specifically filtering for 'mydata'. Any resolver in the chain can stop the rest of the chain by writing 'force_sys_abort' into returned state (for now):
@@ -142,26 +255,13 @@ Calling sys.resolve({mydata:true}) will call all unfiltered resolvers, or all re
 	}
 ```
 
-## Modifications
-
-Every resolver gets a handle on durable persistent state that is instantiated once somewhere. That state can be modified, and resolvers can modify state before the next resolver gets that state.
-
-```
-	const resolver1 = (blob) => {
-		blob.my_special_value = 12
-	}
-	const resolver2 = (blob) => {
-		console.log(blob.my_special_value)
-	}
-	sys.resolve({resolve:resolver1},{resolve:resolver2},{myevent:true})
-	// prints '12'
-```
-
 ## Multiple Instances
 
 Multiple independent instances of sys can be created if desired.
 
-This pubsub service declares globalThis.sys - so one doesn't even have to import the system itself in every file.
+Right now there is some shared state between instances. A cloning concept must be introduced for concepts like { load }. @todo
+
+By default globalThis.sys() is automatically created - so developers do not have to import sys itself over and over.
 
 However there are cases where developers may want to have two or more instances of sys running at the same time. There are serveral variations in how sys.resolve() can be used to support this:
 
@@ -210,9 +310,11 @@ Sys events can technically await but it's not predictable; the internal architec
 	const results = await sys.resolve({resolve},{fetch:"https://news.com"})
 ```
 
+We need async because there are cases where blocking is important, but the pattern itself just doesn't feel totally satisfactory - here is some commentary on it as a whole: https://lucumr.pocoo.org/2024/11/18/threads-beat-async-await/ .
+
 ## Manifests
 
-There are a few built in or reserved pubsub resolvers - one of which is 'load'. This forms a manifest grammar that allows for inhaling of larger collections of state from a file.
+Manifests are a key design feature but are not heavily discussed yet. I will discuss these more in the future. For now, it is worth noting that there are a few built in or 'reserved' pubsub resolvers whose schemas occupy root namespaces that you cannot use yourself. One of these is 'load'. This forms a manifest grammar that allows for inhaling of larger collections of state from a file.
 
 ```
 	sys.resolve({load:"./configuration.js"})

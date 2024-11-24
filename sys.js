@@ -56,18 +56,21 @@ const resolve = async function () {
 		// sanity check
 		else if(!blob) {
 			err(`no data error`)
+			queue.shift()
 			continue
 		}
 
 		// sanity check
 		else if(typeof blob === 'function') {
 			warn(`functions not supported yet`,blob)
+			queue.shift()
 			continue
 		}
 
 		// sanity check
 		else if( typeof blob !== 'object') {
 			err(`must be an object`,blob)
+			queue.shift()
 			continue
 		}
 

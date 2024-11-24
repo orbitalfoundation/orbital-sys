@@ -26,7 +26,7 @@ async function _run(sys) {
 	const tick = {uuid:`orbital/sys/tick/${counter}`,name:'tick',time,delta,tick:true }
 
 	// must await - even though we could be queued; because we want to only run at a certain frequency
-	await sys.resolve(tick)
+	await sys(tick)
 
 	// remember last time
 	sys._timePrevious = time

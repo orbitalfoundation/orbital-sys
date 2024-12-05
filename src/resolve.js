@@ -27,7 +27,6 @@ const resolve = (blob,sys) => {
 		}
 	}
 
-
 	// insert specifically
 	if(blob.resolve.before || blob.resolve.after) {
 		for(let i = 0; i < resolvers.length; i++) {

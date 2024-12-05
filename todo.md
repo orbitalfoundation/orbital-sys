@@ -1,17 +1,15 @@
-# todo nov 23 2024
+# todo dec 3 2024
 
-	* can i import directly from a cdn? yes - https://cdn.jsdelivr.net/npm/orbital-sys@1.0.3/sys.js/+esm
+	- introduce fully qualified inputs and outputs where each object has arbitrary input or output functions
+	  this will help compatibility with visual scripting tools such as behave graph
+	  this also means revising and correcting the filtering logic which is lazily written right now
 
-	- do proper testing / test suite
+	- introduce some kind of test suite
 
-	- a 'meta' component for describing object metadata schemas would be nice
+	- look at an issue where late registered observers miss early fired events
+	  at least the initial batch of observers should all be registered before events are propagated
 
-	- it would be nice if late registered observers could be fed earlier events; but this requires a database
-	- arguably could add a volatile ram database at least; and or indexdb
-	- arguably could add a mongo db binding
+	- consider adding some more built in capabilities such as an in memory db or indexdb, possibly even mongo bindings
 
-	- right now filtering is done very clumsily; would be better to pre-bake the filters
+	- perhaps sys can accept a startup profile - not everybody wants 'tick'
 
-	- it might be nice to specify a profile rather than always having components like 'tick' which not everybody wants
-
-	- philosophy: it might be nice to try think through this all a lot more; i feel like it is still fairly clumsy as an idea

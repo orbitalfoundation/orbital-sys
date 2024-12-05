@@ -6,6 +6,7 @@ import obliterate_resolver from './obliterate.js'
 import schema_resolver from './schema.js'
 //import { family_resolver } from './family.js'
 import load_resolver from './load.js'
+import wire_resolver from './wire.js'
 import tick_resolver from './tick.js'
 
 const isServer = (typeof window === 'undefined') ? true : false
@@ -16,6 +17,10 @@ if(isServer) {
 
 //
 // simple optional filters as a way to reduce traffic
+// @todo this current brute force way of matching on every packet is pretty sloppy
+// right now filters are objects - may generalize
+// may also allow filter functions since will switch to a memoized observer index (see flow.js)
+// a filter is inclusive - so { first: true, second: true } matches either
 //
 
 const filter_match = (blob,resolver) => {
@@ -26,9 +31,24 @@ const filter_match = (blob,resolver) => {
 	return true
 }
 
+//
+// force inject something onto the queue so it is run at a specific time
+// this is for the load helper because users have an expectation of sequentiality in manifests
+// @todo may want to revisit this concept
+//
+
+const _force_inject = function (addme,offset=1) {
+	const queue = this._queue
+	if (queue.length >= offset) {
+	    queue.splice(offset, 0, ...addme);
+	} else {
+	    queue.unshift(...addme);
+	}
+}
 
 //
 // handle events sequentially
+// @todo the single event at a time sequentiality may be revised when filters are improved
 //
 
 const resolve = async function () {
@@ -110,7 +130,6 @@ Object.assign(resolve,{
 	before:"everything",
 	after:null,
 	filter:null,
-	schema: { uuid: true, force_abort_sys: true }
 })
 
 ///
@@ -135,6 +154,13 @@ export function produceSys() {
 
 		// sys.resolve(args) is the pattern i'm using for all entities to handle messages
 		resolve,
+
+		// reserve these fields in the entity namespace
+		// note they are not actually reserved because sys itself predates the schema_resolver @todo
+		schema: { uuid: true, force_abort_sys: true, resolve: true },
+
+		// hack - allow forcing items into queue not at start
+		_force_inject,
 
 		// the sys queue itself; i encourage a pattern of using underbar for private state
 		_queue: [],

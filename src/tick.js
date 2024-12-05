@@ -2,7 +2,7 @@
 const isServer = (typeof window === 'undefined') ? true : false
 
 export let minimumMilliseconds = 10
-export let desiredFramerate = 1000
+export let desiredFramerate = 1000/30
 
 //
 // client and server tick helper - this 

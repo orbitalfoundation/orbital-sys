@@ -15,7 +15,7 @@ This can be imported as a module on the command line with npm or yarn:
 Or you can import from a cdn:
 
 ```
-	import {sys} from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm'
+	import sys from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm'
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ Or you can import from a cdn:
 You can react to state flowing through the pub/sub network by registering an observer or 'resolver' in a javascript file like so:
 
 ```
-	import {sys} from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm'
+	import sys from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm'
 
 	const resolve = async (blob) => {
 		if(!blob.account) return

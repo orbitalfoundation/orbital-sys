@@ -46,7 +46,6 @@ const resolve = async function(blob,sys) {
 		visited[resource] = true
 
 		// mark found objects with the resource path - dealing with returned array collections
-		// @todo arguably artifacts could be granted a uuid at this time as well?
 		const inject_metadata = (key,item) => {
 			if(!item) {
 				err(uuid,'corrupt exports',key)
@@ -55,6 +54,9 @@ const resolve = async function(blob,sys) {
 			} else if(typeof item === 'object') {
 				item._metadata = { key, anchor:resource }
 			}
+			// arguably could grant uuid ... this may need thought since clearly keys can trivially collide
+			// @note another way is to prevent collisions ourselves
+			// if(!item.uuid) item.uuid = key
 		}
 
 		// fetch the file and then visit all found objects

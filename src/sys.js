@@ -47,21 +47,15 @@ const _force_inject = function (addme,offset=1) {
 }
 
 //
-// handle events sequentially
-// @todo the single event at a time sequentiality may be revised when filters are improved
+// handle global events sequentially to adhere to an 'event sourced' data driven pattern for user sanity
 //
 
 const resolve = async function () {
 
-	// if queue is busy then push work and return
 	const queue = this._queue
-	if(queue.length) {
-		queue.push(...arguments)
-		return
-	}
-
-	// resolve work
 	queue.push(...arguments)
+	if(queue.length !== 1) return
+
 	while(queue.length) {
 
 		// get first element in queue; but leave in queue

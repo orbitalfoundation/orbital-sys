@@ -63,7 +63,7 @@ function resolve(entity) {
 ///
 /// right now resolve() is very sloppy - it would be better to hardwire the routes with observers
 ///
-/// experimental self annealing routes between entities
+/// experimental self annealing routes between entities - effectively a form of late binding
 /// @todo turned off for now - still thinking about this - dec 2024
 ///
 

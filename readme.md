@@ -10,13 +10,16 @@ This can be imported as a module on the command line with npm or yarn:
 
 ```
 	npm i 'orbital-sys'
+	import sys from 'orbital-sys'
 ```
 
 Or you can import from a cdn:
 
 ```
-	import sys from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm'
+	import sys from 'https://cdn.jsdelivr.net/npm/orbital-sys/src/sys.js'
 ```
+
+NOTE: While it is nice to use /+esm as in "import sys from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm' there is some kind of issue where an optional feature of manifest loading (see 'load') has an issue where import maps are not respected and end up pointing at cdn.jsdelivr.net rather than your domain url.
 
 ## Usage
 

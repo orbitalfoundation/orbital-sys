@@ -1,6 +1,6 @@
 {
   "name": "orbital-sys",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "experimental pubsub messaging kernel for data driven apps",
   "main": "src/sys.js",
   "scripts": {

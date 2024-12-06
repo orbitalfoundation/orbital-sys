@@ -56,12 +56,11 @@ const uuid = "orbital/sys/tick"
 ///
 
 const resolve = async function(blob,sys) {
-	return
 	if(sys._tickInitialized) return
 	sys._tickInitialized = true
 	_run(sys)
 }
 
-resolve.filter = { _ignore_everything_using_unlikely_filter: true }
+//resolve.filter = { _ignore_everything_using_unlikely_filter: true }
 
 export default { uuid, resolve }

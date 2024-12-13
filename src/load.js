@@ -54,7 +54,7 @@ const resolve = async function(blob,sys) {
 			} else if(typeof item === 'object') {
 				item._metadata = { key, anchor:resource }
 			}
-			// arguably could grant uuid ... this may need thought since clearly keys can trivially collide
+			// @todo arguably could grant uuid ... this may need thought since clearly keys can trivially collide
 			// @note another way is to prevent collisions ourselves
 			// if(!item.uuid) item.uuid = key
 		}

@@ -1,17 +1,23 @@
+
+const uuid = 'orbital/sys/family'
+
 //
-// An observer that helps tidy up parent child relationships
-// This helper is a 'nice to have' - not actually critical
-//
-// @todo note children are not individually marked as 'obliterate' ...
+// exploring ideas around parent child relationships 
 //
 
 const resolve = (blob,sys) => {
 
+	// remove obliterated child
+	// @todo that children are not marked individually for obliterate - this needs refining
 	if(blob.obliterate && blob.parent && blob.parent.children) {
 		blob.parent.children = blob.parent.children.filter(item => item.id !== blob.id)
+		return
 	}
 
-	else if(blob.parent) {
+	// if a parent is specified make sure that the parent has the child in it
+	// @todo debatable if this is a good way to register children - it breaks a datagram concept - should use uuid
+	// @todo parent child relationships should probably be like any other relationship - managed by sys
+	if(blob.parent) {
 		if(!blob.parent.children) blob.parent.children = []
 		const found = blob.parent.children.find((item) => item === blob)
 		if(!found) {
@@ -23,7 +29,7 @@ const resolve = (blob,sys) => {
 resolve.filter = { family: true }
 
 export default {
+	uuid,
 	resolve,
-	uuid: "orbital/sys/family",
 	description: "An early resolver in the pipeline tidy up parent child concepts",
 )

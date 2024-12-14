@@ -50,11 +50,12 @@ const _force_inject = function (addme,offset=1) {
 // handle global events sequentially to adhere to an 'event sourced' data driven pattern for user sanity
 //
 
-const resolve = async function () {
+const resolve = async function (args) {
 
 	const queue = this._queue
+	const busy = queue.length ? true : false
 	queue.push(...arguments)
-	if(queue.length !== 1) return
+	if(busy) return
 
 	while(queue.length) {
 
@@ -90,15 +91,17 @@ const resolve = async function () {
 
 		// use a copy of the resolvers before calling; since objects can register new resolvers on the fly
 		// @todo it is debatable if this idea of 'use a copy of resolvers' should be enforced; may be too strict
-
 		const unadulterated = [ ...this._resolvers ]
+
+		// visit each already registered resolver that was registered prior to the resolver chain being visited
 		for(const resolver of unadulterated) {
 			// has a resolver?
 			if(!resolver.resolve) continue
 			// as a convenience function a resolver can be decorated with simple early filtering
+			// @todo this is ghastly and 'orribly inefficient - please rewrite
 			if(!filter_match(blob,resolver)) continue
 			// perform calls synchronously at this level
-			let results = await resolver.resolve(blob,sys)
+			let results = await resolver.resolve(blob,sys,resolver)
 			// the blob can be modified in transit explicitly or implicitly
 			if(!results) continue
 			// to force abort the chain an explicit change must be returned with this reserved term

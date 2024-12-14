@@ -2,7 +2,17 @@
 
 ## Overview
 
-An experimental publish/subscribe (pub/sub) messaging service written in javascript. It intended to decouple and orchestrate the behavior of other services within an application.
+Orbital is an experimental pub/sub messaging architecture.
+
+The general goals are to:
+
+* Pub/Sub ... Allow code (libraries, modules, agents, functions) to be late bound together using a classic pub/sub pattern. The minimum service offering here is a messaging framework that makes it easy to drop new code into a 'computational soup' and have code run in a reasonable way - handling events, publishing events; including self-annealing or resolving traffic without having to explicitly wire code together beforehand. Also see some of the more academic thinking around observer patterns, event sourced state, and data driven design.
+
+* Wires ... Also allow explicit programmer specified formal late binding of code together, where the output of one code blob becomes the input to another blob of code. This is a common pattern in visual programming languages such as blueprints, flowise, behave-graph and many others, and it maps to classic ideas of forward-imperative programming that most developers are familiar with. In this regard this system becomes something like a linking tool.
+
+* Manifest grammar ... Encourage an application neutral, mostly declarative and human readable manifest or 'scenario definition language' for describing collections of objects (similar to Apple Pkl).
+
+* Agent sandboxes... More experimentally to support ideas around 'agents' or entities with component behaviors, with some emphasis on security, cpuu and memory throttling, sandboxed process isolation leveraging tools such as wasm. The hope is to allow heterogenous agents written by different parties; even adversarial parties, to run together in a durable sandbox, where the sandbox never needs to be rebooted. We tend to see homogenous sandboxes (such as the average MMO game), and we do see services like cloudflare edge workers, where there are heterogenous agents talking to outside services, but we don't see heterogenous agents interacting with each other in durable online marketplaces or shared computational ecosystems yet.
 
 ## Installing
 

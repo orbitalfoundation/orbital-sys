@@ -52,6 +52,10 @@ const _force_inject = function (addme,offset=1) {
 
 const resolve = async function (args) {
 
+if(args && typeof args === 'object' && args.human && args.human.final) {
+	console.error("sys came from",args)
+}
+
 	const queue = this._queue
 	const busy = queue.length ? true : false
 	queue.push(...arguments)
@@ -102,10 +106,8 @@ const resolve = async function (args) {
 			if(!filter_match(blob,resolver)) continue
 			// perform calls synchronously at this level
 			let results = await resolver.resolve(blob,sys,resolver)
-			// the blob can be modified in transit explicitly or implicitly
-			if(!results) continue
 			// to force abort the chain an explicit change must be returned with this reserved term
-			if(results.force_abort_sys) break
+			if(results && results.force_abort_sys) break
 			// arguably this could be explicitly set - but it can be implicitly set that is a bit safer
 			// blob = results
 		}
@@ -168,6 +170,7 @@ export function produceSys() {
 			obliterate_resolver,
 			schema_resolver,
 			load_resolver,
+			wire_resolver,
 			tick_resolver
 		]
 	}

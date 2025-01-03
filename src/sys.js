@@ -52,10 +52,6 @@ const _force_inject = function (addme,offset=1) {
 
 const resolve = async function (args) {
 
-if(args && typeof args === 'object' && args.human && args.human.final) {
-	console.error("sys came from",args)
-}
-
 	const queue = this._queue
 	const busy = queue.length ? true : false
 	queue.push(...arguments)

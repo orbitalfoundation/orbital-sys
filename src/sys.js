@@ -49,6 +49,10 @@ const _force_inject = function (addme,offset=1) {
 //
 // handle global events sequentially to adhere to an 'event sourced' data driven pattern for user sanity
 //
+// resolve tackles one event at a time using await, and allows other events to pile up
+// it detects if the queue is still being processed and just returns in that case
+// right now there is no way of knowing if the queue is flushed @todo
+//
 
 const resolve = async function (args) {
 
@@ -56,6 +60,22 @@ const resolve = async function (args) {
 	const busy = queue.length ? true : false
 	queue.push(...arguments)
 	if(busy) return
+
+	while(queue.length) {
+		await this._resolve_one(queue[0])
+		queue.shift()
+	}
+}
+
+//
+// in a few cases, such as load() it is convenient to resolve one item right away
+// but outside callers should not use this because these events are performed without respecting this._queue
+//
+
+const _resolve_one = async function (blob) {
+
+	// build a mini queue because the actual blob itself could be a collection to resolve
+	const queue = [blob]
 
 	while(queue.length) {
 
@@ -84,7 +104,7 @@ const resolve = async function (args) {
 
 		// sanity check
 		else if( typeof blob !== 'object') {
-			err(`must be an object`,blob)
+			err(`must be an object for now`,blob)
 			queue.shift()
 			continue
 		}
@@ -94,13 +114,14 @@ const resolve = async function (args) {
 		const unadulterated = [ ...this._resolvers ]
 
 		// visit each already registered resolver that was registered prior to the resolver chain being visited
-		for(const resolver of unadulterated) {
+		for(const resolver of this._resolvers) {
 			// has a resolver?
 			if(!resolver.resolve) continue
 			// as a convenience function a resolver can be decorated with simple early filtering
 			// @todo this is ghastly and 'orribly inefficient - please rewrite
 			if(!filter_match(blob,resolver)) continue
 			// perform calls synchronously at this level
+
 			let results = await resolver.resolve(blob,sys,resolver)
 			// to force abort the chain an explicit change must be returned with this reserved term
 			if(results && results.force_abort_sys) break
@@ -108,11 +129,8 @@ const resolve = async function (args) {
 			// blob = results
 		}
 
-		// remove this element from queue
 		queue.shift()
 
-		// return blob when queue is empty as an indicator of completion
-		if(!queue.length) return blob
 	}
 }
 
@@ -141,14 +159,15 @@ export function produceSys() {
 		// convenience
 		isServer,
 
-		// i'm encouraging an optional convention of having an id per entity
+		// i'm encouraging a convention of having an id per entity
 		uuid: `orbital/sys/sys-${counter++}`,
 
-		// i'm encouraging an optional convention of having a description per entity
+		// i'm encouraging a convention of having a description per entity
 		description: 'orbital pubsub broker',
 
 		// sys.resolve(args) is the pattern i'm using for all entities to handle messages
 		resolve,
+		_resolve_one,
 
 		// reserve these fields in the entity namespace
 		// note they are not actually reserved because sys itself predates the schema_resolver @todo
@@ -162,12 +181,12 @@ export function produceSys() {
 
 		// the chain of resolvers - while this could be elsewhere it is convenient to have them here
 		_resolvers: [
-			resolver_resolver,
-			obliterate_resolver,
-			schema_resolver,
 			load_resolver,
-			wire_resolver,
-			tick_resolver
+			resolver_resolver,
+			//obliterate_resolver,
+			//schema_resolver,
+			//wire_resolver,
+			tick_resolver // @todo toying with making this optional
 		]
 	}
 
@@ -180,10 +199,10 @@ export function produceSys() {
 /// a default instance of sys is available at globalThis.sys or 'sys' for other imports in the same context
 ///
 
-const sys = globalThis.sys = produceSys()
+export const sys = globalThis.sys = produceSys()
 
 ///
-/// sys can also be explicitly referenced
+/// also sys is available as the default export
 ///
 
 export default sys

@@ -44,7 +44,7 @@ async function _run(sys) {
 	if(!isServer && window.requestAnimationFrame) {
 		window.requestAnimationFrame(done)
 	} else {
-		console.log(sleep)
+		//console.log(sleep)
 		setTimeout(done,sleep)
 	}
 }

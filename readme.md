@@ -1,18 +1,22 @@
 # Orbital-Sys
 
-## Overview
+## The Problem
 
-Orbital is an experimental pub/sub messaging architecture.
+1) As developers we often seek some kind of orchestration framework to organize software projects. We want to be able to break code up into modules, to have some kind of way of loading up and running those code modules in a shared computational environment.
 
-The general goals are to:
+2) We also sometimes want to be able to dynamically load code modules on the fly, and have them be able to talk to already loaded services, binding to them by specific function names or by more general capabilities, often in some kind of registry, or via a pub/sub mechanism.
 
-* Pub/Sub ... Allow code (libraries, modules, agents, functions) to be late bound together using a classic pub/sub pattern. The minimum service offering here is a messaging framework that makes it easy to drop new code into a 'computational soup' and have code run in a reasonable way - handling events, publishing events; including self-annealing or resolving traffic without having to explicitly wire code together beforehand. Also see some of the more academic thinking around observer patterns, event sourced state, and data driven design.
+3) Ideally we'd like some kind of manifest of parts, code, assets, relationships. Here often programmers either invent their own declarative grammar or effectively just declare their parts in procedural code at startup. Ultimately we want a 'right sized' representation of the big picture, an architectural diagram or 10000 foot view of the complex systems we build - at the highest level - that can be shared with other people.
 
-* Wires ... Also allow explicit programmer specified formal late binding of code together, where the output of one code blob becomes the input to another blob of code. This is a common pattern in visual programming languages such as blueprints, flowise, behave-graph and many others, and it maps to classic ideas of forward-imperative programming that most developers are familiar with. In this regard this system becomes something like a linking tool.
+## This approach
 
-* Manifest grammar ... Encourage an application neutral, mostly declarative and human readable manifest or 'scenario definition language' for describing collections of objects (similar to Apple Pkl).
+1) Pub/sub: A pub/sub architecture seems to allow late binding and can take on the role of a dynamic package manager. There's quite a bit of literature on this topic on the web around observer patterns, event sourced state, and data driven design.
 
-* Agent sandboxes... More experimentally to support ideas around 'agents' or entities with component behaviors, with some emphasis on security, cpuu and memory throttling, sandboxed process isolation leveraging tools such as wasm. The hope is to allow heterogenous agents written by different parties; even adversarial parties, to run together in a durable sandbox, where the sandbox never needs to be rebooted. We tend to see homogenous sandboxes (such as the average MMO game), and we do see services like cloudflare edge workers, where there are heterogenous agents talking to outside services, but we don't see heterogenous agents interacting with each other in durable online marketplaces or shared computational ecosystems yet.
+2) Declarative grammar: a document based approach seems to be a good way to define startup state. This coupled with a pub/sub architecture seems to be a good a way to describe systems of behavior. Our 'manifest' or 'scenario definition language' is an application neutral, mostly declarative and human readable list of objects (similar to Apple Pkl). It's really just json, in fact the loader will load javascript as well to allow variables, loops and compression of the expression of state.
+
+3) Agents: The deeper goal is to support entities with component behaviors, with some emphasis on security, cpuu and memory throttling, sandboxed process isolation leveraging tools such as wasm. The hope is to allow heterogenous agents written by different parties; even adversarial parties, to run together in a durable sandbox, where the sandbox never needs to be rebooted. We tend to see homogenous sandboxes (such as the average MMO game), and we do see services like cloudflare edge workers, where there are heterogenous agents talking to outside services, but we don't see heterogenous agents interacting with each other in durable online marketplaces or shared computational ecosystems yet.
+
+Note I'm definitely interested in other patterns / ideas / approaches if you have recommendations. This has emerged out of my own needs.
 
 ## Installing
 
@@ -38,7 +42,7 @@ You can react to state flowing through the pub/sub network by registering an obs
 ```
 	import sys from 'https://cdn.jsdelivr.net/npm/orbital-sys/+esm'
 
-	const resolve = async (blob) => {
+	const resolve = async (blob,sys) => {
 		if(!blob.account) return
 		console.log("We saw an object with an account property fly past!",blob)
 	}
@@ -62,7 +66,7 @@ And you can publish state to registered pub/sub observers like so:
 
 The method "sys()" is registered on globalThis.sys(). You can also use sys.resolve(arguments) if you wish. Sys() is a single point of entry for most activity. This pub/sub framework deviates from the expected pattern of sys.subscribe(filter,handler) and sys.publish(message) because of an idea of 'manifests' where you can inhale documents that describe state collections declaratively.
 
-## Simple Filters
+## Simple Filters [ TBD - this is being revised - @todo ]
 
 A resolver can have a 'simple filter' which matches the key names of the supplied object. This may be made more fancy later.
 
@@ -149,9 +153,11 @@ In this example observers can catch this state or entity flying past and perform
 
 Important concepts such as removing observers, or more efficient filtering can be added as well without breaking this pattern.
 
-## Resolvers are blind to self, order dependent, and resolve only on past state
+## Resolver messaging quirk
 
-The resolver is not invoked on itself. At the moment this is on purpose and special code is written to make sure that resolvers do not see themselves. This may change - I can see arguments for doing the opposite:
+When a new entity is registered it may see the packet that created it be delivered to itself as a resolve() message. This behavior is still TBD. For now just ignore it. @todo
+
+This may change - I can see arguments for doing the opposite:
 
 ```
 	const resolve = (blob) => {
@@ -165,9 +171,17 @@ The resolver is not invoked on itself. At the moment this is on purpose and spec
 	// the resolver will not trigger even though the object has a physics property
 ```
 
-Also worth re-iterating that a resolver registered *after* some state is published does not see that state. Right now the system is order-dependent. This may change because I do feel it is something of a design defect to have order dependent inflation of a whole system. I may have a state replay or some kind of deferred registration of state after resolvers.
+## Resolvers do not get old state quirk
 
-Finally it is worth noting that a given call to sys() could register multiple new resolvers, but for the purposes of handling a single event those new resolvers are ignored. This may change.
+Also worth re-iterating that a resolver registered *after* some state is published does not see that state. Right now the system is order-dependent. This may change because I do feel it is something of a design defect to have order dependent inflation of a whole system. I may have a state replay or some kind of deferred registration of state after resolvers. @todo
+
+## Observing events
+
+Observing is not a separate function call. You don't register an observer directly by calling a function but rather you publish a listener to sys(), and the listener is noticed and registered in the chain of listeners. This is a bit different from a traditional pub/sub architecture and the reason for that difference is that it allows an ability to inhale 'manifests' of datagrams, some of which are registering observers, and building up an observer chain on the fly. the power of this is that it gives developers an ability to have declarative manifests that incrementally describe whole applications.
+
+## Queue Ordering
+
+It's important to understand that the pub/sub system acts on a single datagram at a time. at any point in handling a single datagram other datagrams may be sent to sys() but those are not de-queued until the current datagram has passed through all observers. This can be confusing to developers since they may treat the pub/sub backbone as imperative, handling their event 'immediately' prior to anything else (and there is in fact a special or secret mode where you can force a datagram to be handled immediately but it is discouraged as a pattern although the load() module does use it to fully resolve loaded blobs before other traffic).
 
 ## Unrolling
 
@@ -241,6 +255,8 @@ Also schema reservation does prevent developers from colliding with each other -
 There are formal schema libraries for javascript and arguably one could be used. This may be improved.
 
 ## Reserved terms
+
+Term reservation is not enforced at the moment - but the intention is that it will be possible to mark entity component namespaces.
 
 These already mean something and cannot be used for new purposes:
 
@@ -327,7 +343,10 @@ We need async because there are cases where blocking is important, but the patte
 
 ## Manifests
 
-Manifests are a key design feature but are not heavily discussed yet. I will discuss these more in the future. For now, it is worth noting that there are a few built in or 'reserved' pubsub resolvers whose schemas occupy root namespaces that you cannot use yourself. One of these is 'load'. This forms a manifest grammar that allows for inhaling of larger collections of state from a file.
+Almost always a complex software system, such as many agent simulations, are going to be initialized with a sequence of many startup agents. This "bring-up" of agents is often described in a text file, or a database, using a factory pattern (where agents self register at compile time, and then are instantiated based on the registered handler). Alternatively, commonly, a main() entry point often just starts up each agent by hand. This is ubiquitous but a kind of 'manifest anti-pattern' in that it is less easy to alter because everything is compiled or buried in procedural logic which is too expressive and more difficult for no-code or graphical authoring tools to revise safely, and often cannot be changed on the fly. In orbital-sys you declare entire applications by registering a bunch of listeners via the sys() call - and this sequence of declarations is effectively a 'manifest' - of which an app can have one or many. This approach is a core pattern in orbital-sys based applications - you'll see that most applications load sys() and then just pass a manifest to it.
+
+Due to a quirk in javascript it is difficult to tell where the current root folder is and this can be passed as an anchor property. There is also some interaction with import maps in javascript and I've encouraged a pattern of declaring an import map of 'shared' or 'root' as the root of the application filespace... unfortunately in server side mode import maps are not available, and as well import maps cannot be revised once built. Note that load does abuse the pub/sub ordering pipeline in that it handles children datagrams immediately, bypassing the normal queue.
+
 
 ```
 	sys.resolve({load:"./configuration.js"})
@@ -335,7 +354,7 @@ Manifests are a key design feature but are not heavily discussed yet. I will dis
 
 ## Tick
 
-Another built in pubsub resolver is the tick event - which can be used to drive systems
+Another built in pubsub resolver is the tick event - which can be used to drive systems. There's some argument to remove this @todo.
 
 ```
 	const resolve = ()=>{ console.log('tick occured') }
@@ -343,7 +362,11 @@ Another built in pubsub resolver is the tick event - which can be used to drive 
 	sys.resolve({resolve})
 ```
 
-# Notes, Limitations and issues
+## Event Sourced State
+
+The pub/sub architecture lends itself to an idea of 'data driven' applications or 'event sourced' state - where you can replay the same sequence of packets to re-create the same behavior of the system.
+
+# Features, Limitations and issues
 
 ## Simple
 

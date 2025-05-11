@@ -10,10 +10,10 @@ const resolve = async function(blob,sys) {
 	// handle candidates in a variety of ways
 	//
 
+	if(!blob || !blob.load) return
+
 	let candidates = []
-	if(!blob.load) {
-		return
-	} else if(Array.isArray(blob.load)) {
+	if(Array.isArray(blob.load)) {
 		candidates = blob.load
 	} else if(typeof blob.load === 'string' || blob.load instanceof String) {
 		candidates = [blob.load]
@@ -38,12 +38,11 @@ const resolve = async function(blob,sys) {
 
 		// only visit a file once ever
 		if(!this._visited) this._visited = {}
-		const visited = this._visited
-		if(visited[resource]) {
-			// warn(uuid,' - already attempted to load once',resource)
+		if(this._visited[resource]) {
+			warn(uuid,' - already attempted to load once',resource)
 			continue
 		}
-		visited[resource] = true
+		this._visited[resource] = resource
 
 		// mark found objects with the resource path - dealing with returned array collections
 		const inject_metadata = (key,item) => {
@@ -54,21 +53,37 @@ const resolve = async function(blob,sys) {
 			} else if(typeof item === 'object') {
 				item._metadata = { key, anchor:resource }
 			}
-			// @todo arguably could grant uuid ... this may need thought since clearly keys can trivially collide
-			// @note another way is to prevent collisions ourselves
-			// if(!item.uuid) item.uuid = key
 		}
 
+		//
 		// fetch the file and then visit all found objects
+		//
+		// there are a few hiccups and questions to ponder:
+		// 
+		// @todo arguably could grant uuid ... this may need thought since clearly keys can trivially collide
+		// if(!item.uuid) item.uuid = key
+		//
+		// @todo there is a case where i want to speculatively peek at folders; I can't seem to do it without an error
+		// await fetch(resource, { method: 'HEAD' }) <- would like to avoid throwing an error...
+		//
+		// @todo there's also a concern about a resolver being added while in the middle of digesting data
+		// if a resolver is added to the chain too early then it can witness its own load packet fly past...
+		// unsure if that is really a problem - sys.resolve() specifically prevents this - see unadulterated
+		//
+		// @todo there's a case where we want to have a single entity do a load and then some work
+		// for example {load,dosomework} where the loader may have loaded a resolver
+		// right now the dosomework packet will not be seen by loaded resolvers in that round
+		// a work-around would be to have this loader call sys._resolve_one(loaded-object)
+		// conceptually it maps to an idea of the system being built in order
+		// but it is risky in that services appear sooner than may be expected... but we will try for now
+		//
+
 		try {
-
-			// @todo there is a case where i want to speculatively peek at folders; I can't seem to do it gracefully
-			// await fetch(resource, { method: 'HEAD' }) <- would like to avoid throwing an error...
-
 			const module = await import(resource)
 			for(const [k,v] of Object.entries(module)) {
 				inject_metadata(k,v)
-				found.push(v)
+				//found.push(v)
+				sys._resolve_one(v)
 			}
 
 		} catch(e) {
@@ -166,17 +181,13 @@ export const harmonize_resource_path = (scope,blob,resource) => {
 	}
 
 	// composit the file and the anchor - URL will strip "../../" and generate a canonical path
-	const url = new URL(resource,anchor)
-
-	// a sanity check to make sure the results are inside of the project folder - @todo may need more study
-	if(isServer) {
-		const safeRoot = new URL("file://"+cwd)
-	    if (!url.pathname.startsWith(safeRoot.pathname)) {
-	    	err('sanity check on root folder')
-	    	return null
-	    }
+	if(!isServer) {
+		const url = new URL(resource,anchor)
+		return url
 	}
 
-	return url.href
+	// server with anchor - no safety checks @todo
+	return anchor + resource.substring(1)
+
 }
 

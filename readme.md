@@ -1,5 +1,15 @@
 # Orbital-Sys
 
+> **Successor: [`orbital-bus`](https://github.com/orbitalfoundation/orbital-bus).**
+> orbital-sys is the original exploration of this pub/sub kernel. The pattern has since been
+> distilled into a maintained, environment-neutral (client + server), documented, and tested
+> package — published on npm as
+> [`@orbitalfoundation/bus`](https://www.npmjs.com/package/@orbitalfoundation/bus) (with
+> [`@orbitalfoundation/utils`](https://www.npmjs.com/package/@orbitalfoundation/utils)). Its
+> [SPEC.md](https://github.com/orbitalfoundation/orbital-bus/blob/main/SPEC.md) writes down the
+> philosophy and pins every load-bearing semantic. **New work should use `@orbitalfoundation/bus`.**
+> This repo remains as the original record of where the idea came from.
+
 ## The Problem
 
 1) As developers we often seek some kind of orchestration framework to organize software projects. We want to be able to break code up into modules, to have some kind of way of loading up and running those code modules in a shared computational environment.
